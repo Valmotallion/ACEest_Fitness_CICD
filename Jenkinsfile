@@ -11,7 +11,7 @@ pipeline {
         SONARQUBE_ENV = 'SonarCloud'
 
         // Docker image info
-        IMAGE_NAME = "valmotallion/aceest_fitness_app"
+        IMAGE_NAME = "aniruddha404/aceest_fitness_app"   // ✅ changed from valmotallion
         IMAGE_TAG = "v1.${BUILD_NUMBER}"
     }
 
@@ -113,6 +113,7 @@ pipeline {
             }
         }
 
+        // ✅ UPDATED DOCKER BUILD STAGE
         stage('Build Docker Image') {
             steps {
                 echo "🐳 Building Docker image..."
@@ -123,11 +124,12 @@ pipeline {
             }
         }
 
+        // ✅ UPDATED DOCKER PUSH STAGE
         stage('Push to Docker Hub') {
             steps {
                 echo "📤 Pushing Docker image to Docker Hub..."
                 sh '''
-                echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
+                echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "aniruddha404" --password-stdin
                 docker push $IMAGE_NAME:$IMAGE_TAG
                 docker push $IMAGE_NAME:latest
                 '''
