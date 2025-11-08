@@ -36,13 +36,11 @@ pipeline {
             steps {
                 echo "🐍 Setting up Python virtual environment..."
                 sh '''
-                # Ensure Python and venv exist
                 if ! command -v python3 >/dev/null 2>&1; then
                     echo "⚠️ Python3 not found, installing user-level Python..."
                     pip install --user virtualenv
                 fi
 
-                # Create isolated virtual environment
                 python3 -m venv venv || python3 -m virtualenv venv
                 . venv/bin/activate
 
@@ -61,11 +59,11 @@ pipeline {
                 export PYTHONPATH=$WORKSPACE
                 echo "PYTHONPATH is set to: $PYTHONPATH"
 
-                # Run pytest explicitly on tests folder
                 if [ -d "tests" ]; then
-                    pytest tests/ --maxfail=1 --disable-warnings --junitxml=pytest-results.xml --cov=. --cov-report=xml -v || true
+                    pytest tests/ --maxfail=1 --disable-warnings \
+                        --junitxml=pytest-results.xml --cov=. --cov-report=xml -v || true
                 else
-                    echo "⚠️ No 'tests/' directory found. Creating a dummy test to keep pipeline stable."
+                    echo "⚠️ No 'tests/' directory found. Creating a dummy test."
                     mkdir -p tests
                     echo "def test_placeholder(): assert True" > tests/test_placeholder.py
                     pytest tests/ --junitxml=pytest-results.xml || true
@@ -81,36 +79,37 @@ pipeline {
         }
 
         stage('SonarCloud Code Quality Analysis') {
-    steps {
-        echo "🔍 Running SonarCloud analysis using Jenkins-managed scanner..."
-        withSonarQubeEnv("${SONARQUBE_ENV}") {
-            // Use the scanner installed via Jenkins Tools
-            script {
-                def scannerHome = tool 'sonar-scanner'  // must match the name in Jenkins Tools
-                sh """
-                . venv/bin/activate
-                ${scannerHome}/bin/sonar-scanner \
-                    -Dsonar.organization=valmotallion \
-                    -Dsonar.projectKey=Valmotallion_ACEest_Fitness_CICD \
-                    -Dsonar.sources=. \
-                    -Dsonar.python.coverage.reportPaths=coverage.xml \
-                    -Dsonar.host.url=https://sonarcloud.io \
-                    -Dsonar.login=${SONAR_TOKEN}
-                """
+            steps {
+                echo "🔍 Running SonarCloud analysis using Jenkins-managed scanner..."
+                withSonarQubeEnv("${SONARQUBE_ENV}") {
+                    script {
+                        def scannerHome = tool 'sonar-scanner'
+                        sh """
+                        . venv/bin/activate
+                        ${scannerHome}/bin/sonar-scanner \
+                            -Dsonar.organization=valmotallion \
+                            -Dsonar.projectKey=Valmotallion_ACEest_Fitness_CICD \
+                            -Dsonar.sources=. \
+                            -Dsonar.python.coverage.reportPaths=coverage.xml \
+                            -Dsonar.host.url=https://sonarcloud.io \
+                            -Dsonar.login=${SONAR_TOKEN}
+                        """
+                    }
                 }
             }
         }
-    }
-
 
         stage('Wait for SonarCloud Quality Gate') {
             steps {
                 timeout(time: 3, unit: 'MINUTES') {
-                    def qg = waitForQualityGate()
-                    echo "🔎 SonarCloud Quality Gate status: ${qg.status}"
-                    if (qg.status != 'OK') {
-                    echo "⚠️ Quality Gate failed — continuing build for testing purposes."
+                    script {
+                        def qg = waitForQualityGate()
+                        echo "🔎 SonarCloud Quality Gate status: ${qg.status}"
+                        if (qg.status != 'OK') {
+                            echo "⚠️ Quality Gate failed — continuing build for testing purposes."
+                        }
                     }
+                }
             }
         }
 
