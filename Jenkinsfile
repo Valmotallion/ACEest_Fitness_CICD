@@ -2,21 +2,15 @@ pipeline {
     agent any
 
     environment {
-        // Credentials
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
         SONAR_TOKEN = credentials('sonar-token')
-
-        // SonarCloud Configuration
         SONARQUBE_ENV = 'SonarCloud'
-
-        // Docker Image Details
         IMAGE_NAME = "valmotallion/aceest_fitness_app"
         IMAGE_TAG = "v1.${BUILD_NUMBER}"
     }
 
     stages {
 
-        // ────────────────────────────────
         stage('Clean Workspace') {
             steps {
                 echo "🧹 Cleaning Jenkins workspace..."
@@ -24,7 +18,6 @@ pipeline {
             }
         }
 
-        // ────────────────────────────────
         stage('Checkout Source') {
             steps {
                 echo "📦 Cloning GitHub repository..."
@@ -33,27 +26,27 @@ pipeline {
             }
         }
 
-        // ────────────────────────────────
         stage('Install Dependencies') {
             steps {
                 echo "🐍 Setting up Python virtual environment..."
                 sh '''
-                # Ensure venv module is available (Debian/Ubuntu fix)
-                apt-get update -y && apt-get install -y python3-venv python3-pip
+                # Ensure Python and venv exist
+                if ! command -v python3 >/dev/null 2>&1; then
+                    echo "⚠️ Python3 not found, installing user-level Python..."
+                    pip install --user virtualenv
+                fi
 
-                # Create and activate venv
-                python3 -m venv venv
+                # Create isolated environment (no sudo)
+                python3 -m venv venv || python3 -m virtualenv venv
                 . venv/bin/activate
 
-                # Install dependencies without caching
                 pip install --upgrade pip
-                pip install --no-cache-dir flask pytest pytest-cov sonar-scanner
-                echo "✅ Virtual environment setup complete"
+                pip install --no-cache-dir flask pytest pytest-cov
+                echo "✅ Virtual environment ready and dependencies installed"
                 '''
             }
         }
 
-        // ────────────────────────────────
         stage('Run Unit Tests with Pytest') {
             steps {
                 echo "🧪 Running Pytest test cases..."
@@ -69,10 +62,9 @@ pipeline {
             }
         }
 
-        // ────────────────────────────────
         stage('SonarCloud Code Quality Analysis') {
             steps {
-                echo "🔍 Running SonarCloud analysis..."
+                echo "🔍 Running SonarCloud analysis (via Jenkins plugin)..."
                 withSonarQubeEnv("${SONARQUBE_ENV}") {
                     sh '''
                     . venv/bin/activate
@@ -88,7 +80,6 @@ pipeline {
             }
         }
 
-        // ────────────────────────────────
         stage('Wait for SonarCloud Quality Gate') {
             steps {
                 timeout(time: 3, unit: 'MINUTES') {
@@ -97,7 +88,6 @@ pipeline {
             }
         }
 
-        // ────────────────────────────────
         stage('Build Docker Image') {
             steps {
                 echo "🐳 Building Docker image..."
@@ -108,7 +98,6 @@ pipeline {
             }
         }
 
-        // ────────────────────────────────
         stage('Push to Docker Hub') {
             steps {
                 echo "📤 Pushing Docker image to Docker Hub..."
@@ -120,12 +109,10 @@ pipeline {
             }
         }
 
-        // ────────────────────────────────
         stage('Deploy to Minikube') {
             steps {
                 echo "🚀 Deploying to Minikube cluster..."
                 sh '''
-                # Apply deployment YAML if not exists, otherwise update
                 kubectl set image deployment/aceest-fitness-deployment aceest-fitness-container=$IMAGE_NAME:$IMAGE_TAG --record || true
                 kubectl apply -f k8s/deployment.yaml || true
                 kubectl apply -f k8s/service.yaml || true
@@ -134,7 +121,6 @@ pipeline {
             }
         }
 
-        // ────────────────────────────────
         stage('Post-Deployment Validation') {
             steps {
                 echo "✅ Validating deployment..."
@@ -146,13 +132,12 @@ pipeline {
         }
     }
 
-    // ────────────────────────────────
     post {
         success {
-            echo "🎉 Pipeline executed successfully! Docker image $IMAGE_NAME:$IMAGE_TAG deployed successfully!"
+            echo "🎉 Pipeline executed successfully! Docker image $IMAGE_NAME:$IMAGE_TAG deployed successfully."
         }
         failure {
-            echo "❌ Pipeline failed. Check Jenkins logs for details."
+            echo "❌ Pipeline failed. Check Jenkins logs for detailed errors."
         }
     }
 }
