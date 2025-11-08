@@ -81,22 +81,27 @@ pipeline {
         }
 
         stage('SonarCloud Code Quality Analysis') {
-            steps {
-                echo "🔍 Running SonarCloud analysis (via Jenkins plugin)..."
-                withSonarQubeEnv("${SONARQUBE_ENV}") {
-                    sh '''
-                    . venv/bin/activate
-                    sonar-scanner \
-                        -Dsonar.organization=valmotallion \
-                        -Dsonar.projectKey=Valmotallion_ACEest_Fitness_CICD \
-                        -Dsonar.sources=. \
-                        -Dsonar.python.coverage.reportPaths=coverage.xml \
-                        -Dsonar.host.url=https://sonarcloud.io \
-                        -Dsonar.login=${SONAR_TOKEN}
-                    '''
+    steps {
+        echo "🔍 Running SonarCloud analysis using Jenkins-managed scanner..."
+        withSonarQubeEnv("${SONARQUBE_ENV}") {
+            // Use the scanner installed via Jenkins Tools
+            script {
+                def scannerHome = tool 'sonar-scanner'  // must match the name in Jenkins Tools
+                sh """
+                . venv/bin/activate
+                ${scannerHome}/bin/sonar-scanner \
+                    -Dsonar.organization=valmotallion \
+                    -Dsonar.projectKey=Valmotallion_ACEest_Fitness_CICD \
+                    -Dsonar.sources=. \
+                    -Dsonar.python.coverage.reportPaths=coverage.xml \
+                    -Dsonar.host.url=https://sonarcloud.io \
+                    -Dsonar.login=${SONAR_TOKEN}
+                """
                 }
             }
         }
+    }
+
 
         stage('Wait for SonarCloud Quality Gate') {
             steps {
