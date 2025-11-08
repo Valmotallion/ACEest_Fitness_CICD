@@ -1,19 +1,15 @@
 pipeline {
-    agent {
-        docker {
-            image 'python:3.10-slim'
-            args '-u root' // allow install inside container
-        }
-    }
+    agent any
+
     environment {
-        // Credentials
+        // Jenkins credentials
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
         SONAR_TOKEN = credentials('sonar-token')
 
         // SonarCloud configuration
         SONARQUBE_ENV = 'SonarCloud'
 
-        // Docker image configuration
+        // Docker image details
         IMAGE_NAME = "valmotallion/aceest_fitness_app"
         IMAGE_TAG = "v1.${BUILD_NUMBER}"
     }
@@ -28,23 +24,25 @@ pipeline {
             }
         }
 
-       stage('Install Dependencies') {
+        stage('Install Dependencies') {
             steps {
-                echo "🐍 Setting up Python environment..."
+                echo "🐍 Setting up Python virtual environment..."
                 sh '''
-                python3 -m pip install --upgrade pip
-                pip3 install flask pytest pytest-cov
-                echo "✅ Dependencies installed successfully"
+                python3 -m venv venv
+                . venv/bin/activate
+                pip install --upgrade pip
+                pip install flask pytest pytest-cov
+                echo "✅ Virtual environment setup complete"
                 '''
             }
         }
-
 
         stage('Run Unit Tests with Pytest') {
             steps {
                 echo "🧪 Running Pytest test cases..."
                 sh '''
-                    pytest --maxfail=1 --disable-warnings -q --cov=. --cov-report=xml
+                . venv/bin/activate
+                pytest --maxfail=1 --disable-warnings -q --cov=. --cov-report=xml
                 '''
             }
             post {
@@ -59,13 +57,14 @@ pipeline {
                 echo "🔍 Running SonarCloud Analysis..."
                 withSonarQubeEnv("${SONARQUBE_ENV}") {
                     sh '''
-                        sonar-scanner \
-                          -Dsonar.organization=valmotallion \
-                          -Dsonar.projectKey=Valmotallion_ACEest_Fitness_CICD \
-                          -Dsonar.sources=. \
-                          -Dsonar.python.coverage.reportPaths=coverage.xml \
-                          -Dsonar.host.url=https://sonarcloud.io \
-                          -Dsonar.login=${SONAR_TOKEN}
+                    . venv/bin/activate
+                    sonar-scanner \
+                        -Dsonar.organization=valmotallion \
+                        -Dsonar.projectKey=Valmotallion_ACEest_Fitness_CICD \
+                        -Dsonar.sources=. \
+                        -Dsonar.python.coverage.reportPaths=coverage.xml \
+                        -Dsonar.host.url=https://sonarcloud.io \
+                        -Dsonar.login=${SONAR_TOKEN}
                     '''
                 }
             }
@@ -75,8 +74,8 @@ pipeline {
             steps {
                 echo "🐳 Building Docker image..."
                 sh '''
-                    docker build -t $IMAGE_NAME:$IMAGE_TAG .
-                    docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
+                docker build -t $IMAGE_NAME:$IMAGE_TAG .
+                docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
                 '''
             }
         }
@@ -85,9 +84,9 @@ pipeline {
             steps {
                 echo "📤 Pushing Docker image to Docker Hub..."
                 sh '''
-                    echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
-                    docker push $IMAGE_NAME:$IMAGE_TAG
-                    docker push $IMAGE_NAME:latest
+                echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
+                docker push $IMAGE_NAME:$IMAGE_TAG
+                docker push $IMAGE_NAME:latest
                 '''
             }
         }
@@ -96,10 +95,10 @@ pipeline {
             steps {
                 echo "🚀 Deploying to Minikube cluster..."
                 sh '''
-                    kubectl set image deployment/aceest-fitness-deployment aceest-fitness-container=$IMAGE_NAME:$IMAGE_TAG --record || true
-                    kubectl apply -f k8s/deployment.yaml
-                    kubectl apply -f k8s/service.yaml
-                    kubectl rollout status deployment/aceest-fitness-deployment
+                kubectl set image deployment/aceest-fitness-deployment aceest-fitness-container=$IMAGE_NAME:$IMAGE_TAG --record || true
+                kubectl apply -f k8s/deployment.yaml
+                kubectl apply -f k8s/service.yaml
+                kubectl rollout status deployment/aceest-fitness-deployment
                 '''
             }
         }
@@ -107,8 +106,10 @@ pipeline {
         stage('Post-Deployment Validation') {
             steps {
                 echo "✅ Validating deployment..."
-                sh 'kubectl get pods -o wide'
-                sh 'kubectl get svc'
+                sh '''
+                kubectl get pods -o wide
+                kubectl get svc
+                '''
             }
         }
     }
