@@ -24,17 +24,17 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
+       stage('Install Dependencies') {
             steps {
                 echo "🐍 Setting up Python environment..."
                 sh '''
-                    apt-get update -y
-                    apt-get install -y python3 python3-pip
-                    pip3 install --upgrade pip
-                    pip3 install flask pytest pytest-cov sonar-scanner
+                python3 -m pip install --upgrade pip
+                pip3 install flask pytest pytest-cov
+                echo "✅ Dependencies installed successfully"
                 '''
             }
         }
+
 
         stage('Run Unit Tests with Pytest') {
             steps {
