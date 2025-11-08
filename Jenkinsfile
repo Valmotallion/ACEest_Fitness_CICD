@@ -1,6 +1,10 @@
 pipeline {
-    agent any
-
+    agent {
+        docker {
+            image 'python:3.10-slim'
+            args '-u root' // allow install inside container
+        }
+    }
     environment {
         // Credentials
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
