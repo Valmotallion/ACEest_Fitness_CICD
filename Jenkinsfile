@@ -2,20 +2,29 @@ pipeline {
     agent any
 
     environment {
-        // Jenkins credentials
+        // Credentials
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
         SONAR_TOKEN = credentials('sonar-token')
 
-        // SonarCloud configuration
+        // SonarCloud Configuration
         SONARQUBE_ENV = 'SonarCloud'
 
-        // Docker image details
+        // Docker Image Details
         IMAGE_NAME = "valmotallion/aceest_fitness_app"
         IMAGE_TAG = "v1.${BUILD_NUMBER}"
     }
 
     stages {
 
+        // ────────────────────────────────
+        stage('Clean Workspace') {
+            steps {
+                echo "🧹 Cleaning Jenkins workspace..."
+                cleanWs()
+            }
+        }
+
+        // ────────────────────────────────
         stage('Checkout Source') {
             steps {
                 echo "📦 Cloning GitHub repository..."
@@ -24,37 +33,46 @@ pipeline {
             }
         }
 
+        // ────────────────────────────────
         stage('Install Dependencies') {
             steps {
                 echo "🐍 Setting up Python virtual environment..."
                 sh '''
+                # Ensure venv module is available (Debian/Ubuntu fix)
+                apt-get update -y && apt-get install -y python3-venv python3-pip
+
+                # Create and activate venv
                 python3 -m venv venv
                 . venv/bin/activate
+
+                # Install dependencies without caching
                 pip install --upgrade pip
-                pip install flask pytest pytest-cov
+                pip install --no-cache-dir flask pytest pytest-cov sonar-scanner
                 echo "✅ Virtual environment setup complete"
                 '''
             }
         }
 
+        // ────────────────────────────────
         stage('Run Unit Tests with Pytest') {
             steps {
                 echo "🧪 Running Pytest test cases..."
                 sh '''
                 . venv/bin/activate
-                pytest --maxfail=1 --disable-warnings -q --cov=. --cov-report=xml
+                pytest --maxfail=1 --disable-warnings --junitxml=pytest-results.xml --cov=. --cov-report=xml
                 '''
             }
             post {
                 always {
-                    junit '**/pytest*.xml'
+                    junit 'pytest-results.xml'
                 }
             }
         }
 
+        // ────────────────────────────────
         stage('SonarCloud Code Quality Analysis') {
             steps {
-                echo "🔍 Running SonarCloud Analysis..."
+                echo "🔍 Running SonarCloud analysis..."
                 withSonarQubeEnv("${SONARQUBE_ENV}") {
                     sh '''
                     . venv/bin/activate
@@ -70,6 +88,16 @@ pipeline {
             }
         }
 
+        // ────────────────────────────────
+        stage('Wait for SonarCloud Quality Gate') {
+            steps {
+                timeout(time: 3, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        // ────────────────────────────────
         stage('Build Docker Image') {
             steps {
                 echo "🐳 Building Docker image..."
@@ -80,6 +108,7 @@ pipeline {
             }
         }
 
+        // ────────────────────────────────
         stage('Push to Docker Hub') {
             steps {
                 echo "📤 Pushing Docker image to Docker Hub..."
@@ -91,18 +120,21 @@ pipeline {
             }
         }
 
+        // ────────────────────────────────
         stage('Deploy to Minikube') {
             steps {
                 echo "🚀 Deploying to Minikube cluster..."
                 sh '''
+                # Apply deployment YAML if not exists, otherwise update
                 kubectl set image deployment/aceest-fitness-deployment aceest-fitness-container=$IMAGE_NAME:$IMAGE_TAG --record || true
-                kubectl apply -f k8s/deployment.yaml
-                kubectl apply -f k8s/service.yaml
+                kubectl apply -f k8s/deployment.yaml || true
+                kubectl apply -f k8s/service.yaml || true
                 kubectl rollout status deployment/aceest-fitness-deployment
                 '''
             }
         }
 
+        // ────────────────────────────────
         stage('Post-Deployment Validation') {
             steps {
                 echo "✅ Validating deployment..."
@@ -114,12 +146,13 @@ pipeline {
         }
     }
 
+    // ────────────────────────────────
     post {
         success {
-            echo "🎉 Pipeline executed successfully! Docker image $IMAGE_NAME:$IMAGE_TAG deployed."
+            echo "🎉 Pipeline executed successfully! Docker image $IMAGE_NAME:$IMAGE_TAG deployed successfully!"
         }
         failure {
-            echo "❌ Pipeline failed. Check the Jenkins console logs for errors."
+            echo "❌ Pipeline failed. Check Jenkins logs for details."
         }
     }
 }
