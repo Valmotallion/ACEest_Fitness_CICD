@@ -135,18 +135,21 @@ pipeline {
                 '''
             }
         }
-
         stage('Deploy to Minikube') {
             steps {
-                echo "🚀 Deploying to Minikube cluster..."
-                sh '''
-                kubectl set image deployment/aceest-fitness-deployment aceest-fitness-container=$IMAGE_NAME:$IMAGE_TAG --record || true
-                kubectl apply -f k8s/deployment.yaml || true
-                kubectl apply -f k8s/service.yaml || true
-                kubectl rollout status deployment/aceest-fitness-deployment
-                '''
-            }
+            echo "🚀 Deploying to Minikube cluster..."
+            sh '''
+            # Ensure kubectl is in PATH
+            export PATH=$PATH:/usr/local/bin
+
+            kubectl set image deployment/aceest-fitness-deployment aceest-fitness-container=$IMAGE_NAME:$IMAGE_TAG --record || true
+            kubectl apply -f k8s/deployment.yaml || true
+            kubectl apply -f k8s/service.yaml || true
+            kubectl rollout status deployment/aceest-fitness-deployment
+            '''
         }
+    }
+
 
         stage('Post-Deployment Validation') {
             steps {
