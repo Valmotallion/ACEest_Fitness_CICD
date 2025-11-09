@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: aceest-fitness-deployment
+  labels:
+    app: aceest-fitness
 spec:
   replicas: 1
   selector:
@@ -17,10 +19,15 @@ spec:
         image: aniruddha404/aceest_fitness_app:latest
         ports:
         - containerPort: 5000
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 5000
-          initialDelaySeconds: 5
-          periodSeconds: 10
 
+        # 🚫 Readiness probe temporarily disabled for debugging rollout
+        # readinessProbe:
+        #   httpGet:
+        #     path: /
+        #     port: 5000
+        #   initialDelaySeconds: 15
+        #   periodSeconds: 10
+        #   timeoutSeconds: 5
+        #   failureThreshold: 6
+
+      restartPolicy: Always

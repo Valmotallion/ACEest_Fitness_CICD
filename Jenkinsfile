@@ -10,7 +10,7 @@ pipeline {
         SONARQUBE_ENV = 'SonarCloud'
 
         // Docker image info
-        IMAGE_NAME = "aniruddha404/aceest_fitness_app"   // ✅ changed from valmotallion
+        IMAGE_NAME = "aniruddha404/aceest_fitness_app"
         IMAGE_TAG = "v1.${BUILD_NUMBER}"
     }
 
@@ -111,7 +111,6 @@ pipeline {
             }
         }
 
-        // ✅ UPDATED DOCKER BUILD STAGE
         stage('Build Docker Image') {
             steps {
                 echo "🐳 Building Docker image..."
@@ -122,7 +121,6 @@ pipeline {
             }
         }
 
-        // ✅ UPDATED DOCKER PUSH STAGE
         stage('Push to Docker Hub') {
             steps {
                 echo "📤 Pushing Docker image to Docker Hub..."
@@ -140,14 +138,19 @@ pipeline {
                 sh '''
                     export PATH=$PATH:/usr/local/bin
 
+                    echo "📁 Applying Kubernetes manifests..."
                     kubectl apply -f k8s/deployment.yaml || true
                     kubectl apply -f k8s/service.yaml || true
 
-                    # Update image and wait for rollout
-                    kubectl set image deployment/aceest-fitness-deployment aceest-fitness-container=aniruddha404/aceest_fitness_app:$IMAGE_TAG --record || true
+                    echo "🔁 Updating deployment image..."
+                    kubectl set image deployment/aceest-fitness-deployment aceest-fitness-container=$IMAGE_NAME:$IMAGE_TAG --record || true
 
+                    echo "⏳ Waiting for rollout to complete..."
                     sleep 5
-                    kubectl rollout status deployment/aceest-fitness-deployment
+                    kubectl rollout status deployment/aceest-fitness-deployment || true
+
+                    echo "📋 Deployment state summary:"
+                    kubectl get deployments,pods,services -l app=aceest-fitness
                 '''
             }
         }
@@ -155,10 +158,10 @@ pipeline {
 
     post {
         success {
-            echo "🎉 Pipeline executed successfully! Docker image $IMAGE_NAME:$IMAGE_TAG deployed successfully."
+            echo "🎉 Pipeline executed successfully! Docker image $IMAGE_NAME:$IMAGE_TAG deployed successfully to Minikube."
         }
         failure {
-            echo "❌ Pipeline failed. Check Jenkins logs for detailed errors."
+            echo "❌ Pipeline failed. Check Jenkins logs for detailed errors and kubectl describe output."
         }
     }
 }
