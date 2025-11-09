@@ -135,36 +135,24 @@ pipeline {
                 '''
             }
         }
-       stage('Deploy to Minikube') {
-            steps {
-                echo "🚀 Deploying to Minikube cluster..."
-                sh '''
-                export PATH=$PATH:/usr/local/bin
+   stage('Deploy to Minikube') {
+    steps {
+        echo "🚀 Deploying to Minikube cluster..."
+        sh '''
+            export PATH=$PATH:/usr/local/bin
 
-                # Apply manifests (create or update)
-                kubectl apply -f k8s/deployment.yaml || true
-                kubectl apply -f k8s/service.yaml || true
+            kubectl apply -f k8s/deployment.yaml || true
+            kubectl apply -f k8s/service.yaml || true
 
-                # Update image & verify rollout
-                kubectl set image deployment/$K8S_DEPLOYMENT $K8S_CONTAINER=$IMAGE_NAME:$IMAGE_TAG --record || true
-                sleep 5
-                kubectl rollout status deployment/$K8S_DEPLOYMENT
-                '''
-            }
-        }
+            # Update image and wait for rollout
+            kubectl set image deployment/aceest-fitness-deployment aceest-fitness-container=aniruddha404/aceest_fitness_app:$IMAGE_TAG --record || true
 
-
-
-        stage('Post-Deployment Validation') {
-            steps {
-                echo "✅ Validating deployment..."
-                sh '''
-                kubectl get pods -o wide
-                kubectl get svc
-                '''
-            }
-        }
+            sleep 5
+            kubectl rollout status deployment/aceest-fitness-deployment
+        '''
     }
+}
+
 
     post {
         success {
