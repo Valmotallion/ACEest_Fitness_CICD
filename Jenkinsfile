@@ -1,5 +1,4 @@
 pipeline {
-
     agent any
 
     environment {
@@ -16,7 +15,6 @@ pipeline {
     }
 
     stages {
-
         stage('Clean Workspace') {
             steps {
                 echo "🧹 Cleaning Jenkins workspace..."
@@ -36,17 +34,17 @@ pipeline {
             steps {
                 echo "🐍 Setting up Python virtual environment..."
                 sh '''
-                if ! command -v python3 >/dev/null 2>&1; then
-                    echo "⚠️ Python3 not found, installing user-level Python..."
-                    pip install --user virtualenv
-                fi
+                    if ! command -v python3 >/dev/null 2>&1; then
+                        echo "⚠️ Python3 not found, installing user-level Python..."
+                        pip install --user virtualenv
+                    fi
 
-                python3 -m venv venv || python3 -m virtualenv venv
-                . venv/bin/activate
+                    python3 -m venv venv || python3 -m virtualenv venv
+                    . venv/bin/activate
 
-                pip install --upgrade pip
-                pip install --no-cache-dir flask pytest pytest-cov
-                echo "✅ Virtual environment ready and dependencies installed"
+                    pip install --upgrade pip
+                    pip install --no-cache-dir flask pytest pytest-cov
+                    echo "✅ Virtual environment ready and dependencies installed"
                 '''
             }
         }
@@ -55,19 +53,19 @@ pipeline {
             steps {
                 echo "🧪 Running Pytest test cases..."
                 sh '''
-                . venv/bin/activate
-                export PYTHONPATH=$WORKSPACE
-                echo "PYTHONPATH is set to: $PYTHONPATH"
+                    . venv/bin/activate
+                    export PYTHONPATH=$WORKSPACE
+                    echo "PYTHONPATH is set to: $PYTHONPATH"
 
-                if [ -d "tests" ]; then
-                    pytest tests/ --maxfail=1 --disable-warnings \
-                        --junitxml=pytest-results.xml --cov=. --cov-report=xml -v || true
-                else
-                    echo "⚠️ No 'tests/' directory found. Creating a dummy test."
-                    mkdir -p tests
-                    echo "def test_placeholder(): assert True" > tests/test_placeholder.py
-                    pytest tests/ --junitxml=pytest-results.xml || true
-                fi
+                    if [ -d "tests" ]; then
+                        pytest tests/ --maxfail=1 --disable-warnings \
+                            --junitxml=pytest-results.xml --cov=. --cov-report=xml -v || true
+                    else
+                        echo "⚠️ No 'tests/' directory found. Creating a dummy test."
+                        mkdir -p tests
+                        echo "def test_placeholder(): assert True" > tests/test_placeholder.py
+                        pytest tests/ --junitxml=pytest-results.xml || true
+                    fi
                 '''
             }
             post {
@@ -85,14 +83,14 @@ pipeline {
                     script {
                         def scannerHome = tool 'sonar-scanner'
                         sh """
-                        . venv/bin/activate
-                        ${scannerHome}/bin/sonar-scanner \
-                            -Dsonar.organization=valmotallion \
-                            -Dsonar.projectKey=Valmotallion_ACEest_Fitness_CICD \
-                            -Dsonar.sources=. \
-                            -Dsonar.python.coverage.reportPaths=coverage.xml \
-                            -Dsonar.host.url=https://sonarcloud.io \
-                            -Dsonar.login=${SONAR_TOKEN}
+                            . venv/bin/activate
+                            ${scannerHome}/bin/sonar-scanner \
+                                -Dsonar.organization=valmotallion \
+                                -Dsonar.projectKey=Valmotallion_ACEest_Fitness_CICD \
+                                -Dsonar.sources=. \
+                                -Dsonar.python.coverage.reportPaths=coverage.xml \
+                                -Dsonar.host.url=https://sonarcloud.io \
+                                -Dsonar.login=${SONAR_TOKEN}
                         """
                     }
                 }
@@ -118,8 +116,8 @@ pipeline {
             steps {
                 echo "🐳 Building Docker image..."
                 sh '''
-                docker build -t $IMAGE_NAME:$IMAGE_TAG .
-                docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
+                    docker build -t $IMAGE_NAME:$IMAGE_TAG .
+                    docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
                 '''
             }
         }
@@ -129,30 +127,31 @@ pipeline {
             steps {
                 echo "📤 Pushing Docker image to Docker Hub..."
                 sh '''
-                echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "aniruddha404" --password-stdin
-                docker push $IMAGE_NAME:$IMAGE_TAG
-                docker push $IMAGE_NAME:latest
+                    echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "aniruddha404" --password-stdin
+                    docker push $IMAGE_NAME:$IMAGE_TAG
+                    docker push $IMAGE_NAME:latest
                 '''
             }
         }
-   stage('Deploy to Minikube') {
-    steps {
-        echo "🚀 Deploying to Minikube cluster..."
-        sh '''
-            export PATH=$PATH:/usr/local/bin
 
-            kubectl apply -f k8s/deployment.yaml || true
-            kubectl apply -f k8s/service.yaml || true
+        stage('Deploy to Minikube') {
+            steps {
+                echo "🚀 Deploying to Minikube cluster..."
+                sh '''
+                    export PATH=$PATH:/usr/local/bin
 
-            # Update image and wait for rollout
-            kubectl set image deployment/aceest-fitness-deployment aceest-fitness-container=aniruddha404/aceest_fitness_app:$IMAGE_TAG --record || true
+                    kubectl apply -f k8s/deployment.yaml || true
+                    kubectl apply -f k8s/service.yaml || true
 
-            sleep 5
-            kubectl rollout status deployment/aceest-fitness-deployment
-        '''
+                    # Update image and wait for rollout
+                    kubectl set image deployment/aceest-fitness-deployment aceest-fitness-container=aniruddha404/aceest_fitness_app:$IMAGE_TAG --record || true
+
+                    sleep 5
+                    kubectl rollout status deployment/aceest-fitness-deployment
+                '''
+            }
+        }
     }
-}
-
 
     post {
         success {
