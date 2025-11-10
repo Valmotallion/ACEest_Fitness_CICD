@@ -44,7 +44,8 @@ pipeline {
                    pip install --no-cache-dir flask pytest pytest-cov
                    echo "✅ Dependencies installed (Flask + Pytest + Pytest-Cov)"
                '''
-           }
+            }
+        }
 
         stage('Run Unit Tests with Pytest') {
            steps {
