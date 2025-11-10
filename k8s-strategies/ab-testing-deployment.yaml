@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-fitness-ab
+  labels:
+    app: aceest-fitness
+    version: B
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      version: B
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        version: B
+    spec:
+      containers:
+      - name: aceest-fitness-container
+        image: aniruddha404/aceest_fitness_app:latest
+        ports:
+        - containerPort: 5000
