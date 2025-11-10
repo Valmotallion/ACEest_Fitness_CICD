@@ -86,6 +86,10 @@ pipeline {
                         def scannerHome = tool 'sonar-scanner'
                         sh """
                             . venv/bin/activate
+                            if [ ! -f "coverage.xml" ]; then
+                                echo "⚠️ coverage.xml not found, creating dummy coverage file..."
+                                echo '<?xml version="1.0" ?><coverage></coverage>' > coverage.xml
+                            fi
                             ${scannerHome}/bin/sonar-scanner \
                                 -Dsonar.organization=valmotallion \
                                 -Dsonar.projectKey=Valmotallion_ACEest_Fitness_CICD \
