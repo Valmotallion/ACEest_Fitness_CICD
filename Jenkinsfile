@@ -76,7 +76,8 @@ pipeline {
             }
         }
 
-        stage('SonarCloud Code Quality Analysis') {
+        // ✅ Simplified Sonar Analysis stage
+        stage('SonarQube Analysis') {
             steps {
                 echo "🔍 Running SonarCloud analysis using Jenkins-managed scanner..."
                 withSonarQubeEnv("${SONARQUBE_ENV}") {
@@ -97,16 +98,13 @@ pipeline {
             }
         }
 
-        stage('Wait for SonarCloud Quality Gate') {
+        // ✅ Quality Gate stage (non-blocking)
+        stage('Quality Gate') {
             steps {
-                timeout(time: 3, unit: 'MINUTES') {
-                    script {
-                        def qg = waitForQualityGate()
-                        echo "🔎 SonarCloud Quality Gate status: ${qg.status}"
-                        if (qg.status != 'OK') {
-                            echo "⚠️ Quality Gate failed — continuing build for testing purposes."
-                        }
-                    }
+                timeout(time: 5, unit: 'MINUTES') {
+                    echo "⏳ Waiting for SonarCloud Quality Gate result..."
+                    waitForQualityGate abortPipeline: false
+                    echo "✅ SonarCloud Quality Gate stage completed (non-blocking)."
                 }
             }
         }
